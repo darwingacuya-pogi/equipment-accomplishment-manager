@@ -192,11 +192,18 @@ async function saveToGoogleSheets(record, env) {
     return { action: "updated" };
   }
 
-  // Otherwise, append a new record after existing records.
+  // Otherwise, write the new record into the next available row.
+  // Only columns A:D are modified. No rows are inserted.
+  const nextRow = Math.max(rows.length + 1, 2);
+
+  const newRowRange = encodeURIComponent(
+    `Records!A${nextRow}:D${nextRow}`
+  );
+
   const appendResponse = await fetch(
-    `${url}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+    `${GOOGLE_SHEETS_API}/${spreadsheetId}/values/${newRowRange}?valueInputOption=RAW`,
     {
-      method: "POST",
+      method: "PUT",
       headers,
       body: JSON.stringify({ values })
     }
@@ -205,7 +212,7 @@ async function saveToGoogleSheets(record, env) {
   const appendResult = await appendResponse.json();
 
   if (!appendResponse.ok) {
-    console.error("Google Sheets append error:", appendResult);
+    console.error("Google Sheets write error:", appendResult);
     throw new Error("Unable to append the new record.");
   }
 
