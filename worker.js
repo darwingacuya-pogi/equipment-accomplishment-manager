@@ -263,14 +263,19 @@ export default {
           throw new Error("Google Sheets configuration is incomplete.");
         }
 
-        await saveToGoogleSheets(
+        const saveResult = await saveToGoogleSheets(
           { date, equipment, hmr },
           env
         );
-
+        
+        const wasUpdated = saveResult.action === "updated";
+        
         return jsonResponse({
           success: true,
-          message: "Record saved successfully."
+          action: saveResult.action,
+          message: wasUpdated
+            ? "Existing record updated successfully."
+            : "New record saved successfully."
         });
 
       } catch (error) {
