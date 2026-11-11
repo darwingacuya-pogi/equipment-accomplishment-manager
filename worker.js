@@ -114,17 +114,50 @@ async function getGoogleAccessToken(env) {
   return tokenData.access_token;
 }
 
-// Save one record to Google Sheets
+
+// Save one record per equipment name per date.
+// Update an existing row if the same date and equipment already exist.
 async function saveToGoogleSheets(record, env) {
   const accessToken = await getGoogleAccessToken(env);
-
   const spreadsheetId = env.GOOGLE_SHEET_ID;
+
+  const headers = {
+    "Authorization": `Bearer ${accessToken}`,
+    "Content-Type": "application/json"
+  };
 
   const range = encodeURIComponent("Records!A:D");
 
   const url =
-    `${GOOGLE_SHEETS_API}/${spreadsheetId}/values/${range}:append` +
-    "?valueInputOption=RAW&insertDataOption=INSERT_ROWS";
+    `${GOOGLE_SHEETS_API}/${spreadsheetId}/values/${range}`;
+
+  // Read existing records from Google Sheets.
+  const readResponse = await fetch(url, {
+    method: "GET",
+    headers
+  });
+
+  const existingData = await readResponse.json();
+
+  if (!readResponse.ok) {
+    console.error("Google Sheets read error:", existingData);
+    throw new Error("Unable to check existing records.");
+  }
+
+  const rows = existingData.values || [];
+
+  // Ignore capitalization and extra spaces when comparing equipment names.
+  const normalizeEquipment = value =>
+    String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+
+  const submittedEquipment = normalizeEquipment(record.equipment);
+
+  // Find a matching date and equipment name, skipping the header row.
+  const existingIndex = rows.findIndex((row, index) =>
+    index > 0 &&
+    String(row[0] || "").trim() === record.date &&
+    normalizeEquipment(row[1]) === submittedEquipment
+  );
 
   const values = [[
     record.date,
@@ -133,26 +166,51 @@ async function saveToGoogleSheets(record, env) {
     new Date().toISOString()
   ]];
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${accessToken}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      values
-    })
-  });
+  // If a matching record exists, replace that row.
+  if (existingIndex !== -1) {
+    const rowNumber = existingIndex + 1;
 
-  const result = await response.json();
+    const updateRange = encodeURIComponent(
+      `Records!A${rowNumber}:D${rowNumber}`
+    );
 
-  if (!response.ok) {
-    console.error("Google Sheets error:", result);
+    const updateResponse = await fetch(
+      `${GOOGLE_SHEETS_API}/${spreadsheetId}/values/${updateRange}?valueInputOption=RAW`,
+      {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ values })
+      }
+    );
 
-    throw new Error("Unable to save the record to Google Sheets.");
+    const updateResult = await updateResponse.json();
+
+    if (!updateResponse.ok) {
+      console.error("Google Sheets update error:", updateResult);
+      throw new Error("Unable to update the existing record.");
+    }
+
+    return { action: "updated" };
   }
 
-  return result;
+  // Otherwise, append a new record.
+  const appendResponse = await fetch(
+    `${url}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ values })
+    }
+  );
+
+  const appendResult = await appendResponse.json();
+
+  if (!appendResponse.ok) {
+    console.error("Google Sheets append error:", appendResult);
+    throw new Error("Unable to append the new record.");
+  }
+
+  return { action: "appended" };
 }
 
 // Main Worker
