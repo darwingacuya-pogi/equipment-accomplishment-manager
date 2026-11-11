@@ -216,7 +216,7 @@ export default {
         });
 
       } catch (error) {
-        console.error("Submission failed:", error);
+        console.error("Submission failed:", error?.name, error?.message, error?.stack);
 
         return jsonResponse(
           {
