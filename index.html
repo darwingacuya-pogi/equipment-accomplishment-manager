@@ -1,0 +1,129 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#142b25">
+  <meta name="description" content="Equipment Accomplishment Manager">
+  <title>Equipment Accomplishment Manager</title>
+
+  <link rel="stylesheet" href="/assets/styles.css">
+
+  <script src="/js/sheets.js" defer></script>
+  <script src="/js/app.js" defer></script>
+</head>
+
+<body>
+  <main class="page-shell">
+
+    <header class="page-header">
+      <div class="brand-mark">EA</div>
+
+      <div>
+        <p class="eyebrow">FIELD RECORDS</p>
+        <h1>Equipment Accomplishment</h1>
+        <p class="subtitle">
+          Record equipment meter readings.
+        </p>
+      </div>
+    </header>
+
+    <section class="entry-card">
+
+      <div class="card-heading">
+        <div>
+          <p class="eyebrow">NEW RECORD</p>
+          <h2>Equipment entry</h2>
+        </div>
+
+        <span class="live-indicator">
+          <span></span> Ready
+        </span>
+      </div>
+
+      <form id="equipment-form">
+
+        <div class="form-grid">
+
+          <label class="field" for="date">
+            <span>Date</span>
+            <input
+              id="date"
+              name="date"
+              type="date"
+              required
+            >
+          </label>
+
+          <label class="field equipment-field" for="equipment">
+            <span>Equipment</span>
+            <input
+              id="equipment"
+              name="equipment"
+              type="text"
+              placeholder="e.g. EX01"
+              maxlength="100"
+              required
+            >
+          </label>
+
+          <label class="field" for="hmr">
+            <span>HMR</span>
+            <input
+              id="hmr"
+              name="hmr"
+              type="number"
+              inputmode="decimal"
+              min="0"
+              step="any"
+              placeholder="0000.0"
+              required
+            >
+          </label>
+
+        </div>
+
+        <div class="form-footer">
+
+          <p class="helper-text">
+            After a successful submission, the fields
+            will clear for the next equipment.
+          </p>
+
+          <button id="submit-button" type="submit">
+            <span class="button-label">Submit record</span>
+            <span class="button-arrow">→</span>
+          </button>
+
+        </div>
+
+        <p
+          id="form-message"
+          class="form-message"
+          role="status"
+          aria-live="polite"
+        ></p>
+
+      </form>
+    </section>
+
+    <section class="info-strip">
+      <div class="info-icon">↗</div>
+
+      <p>
+        <strong>One submission = one record.</strong>
+        <br>
+        Each entry is added as a new row in your
+        connected Google Sheet.
+      </p>
+    </section>
+
+    <footer class="page-footer">
+      EQUIPMENT ACCOMPLISHMENT MANAGER
+      <span>•</span> v1.0
+    </footer>
+
+  </main>
+</body>
+</html>
