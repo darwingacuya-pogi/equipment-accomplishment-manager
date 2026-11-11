@@ -114,11 +114,8 @@ async function getGoogleAccessToken(env) {
   return tokenData.access_token;
 }
 
-
-
 // Save one record per equipment name per date.
-// New records are inserted at row 2.
-// Existing matching records are moved to row 2.
+// Update an existing row if the same date and equipment already exist.
 async function saveToGoogleSheets(record, env) {
   const accessToken = await getGoogleAccessToken(env);
   const spreadsheetId = env.GOOGLE_SHEET_ID;
@@ -128,13 +125,12 @@ async function saveToGoogleSheets(record, env) {
     "Content-Type": "application/json"
   };
 
-  const baseUrl =
-    `${GOOGLE_SHEETS_API}/${spreadsheetId}`;
-
   const range = encodeURIComponent("Records!A:D");
-  const url = `${baseUrl}/values/${range}`;
 
-  // Read existing records.
+  const url =
+    `${GOOGLE_SHEETS_API}/${spreadsheetId}/values/${range}`;
+
+  // Read existing records from Google Sheets.
   const readResponse = await fetch(url, {
     method: "GET",
     headers
@@ -149,40 +145,13 @@ async function saveToGoogleSheets(record, env) {
 
   const rows = existingData.values || [];
 
-  // Get the Google Sheets tab ID.
-  const metadataResponse = await fetch(
-    `${baseUrl}?fields=sheets.properties(sheetId,title)`,
-    { method: "GET", headers }
-  );
-
-  const metadata = await metadataResponse.json();
-
-  if (!metadataResponse.ok) {
-    console.error("Google Sheets metadata error:", metadata);
-    throw new Error("Unable to identify the Records sheet.");
-  }
-
-  const recordsSheet = (metadata.sheets || []).find(
-    sheet => sheet.properties.title === "Records"
-  );
-
-  if (!recordsSheet) {
-    throw new Error("Records worksheet was not found.");
-  }
-
-  const sheetId = recordsSheet.properties.sheetId;
-
-  // Normalize equipment names.
+  // Ignore capitalization and extra spaces when comparing equipment names.
   const normalizeEquipment = value =>
-    String(value || "")
-      .trim()
-      .replace(/\s+/g, " ")
-      .toLowerCase();
+    String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
 
-  const submittedEquipment =
-    normalizeEquipment(record.equipment);
+  const submittedEquipment = normalizeEquipment(record.equipment);
 
-  // Find matching date and equipment.
+  // Find a matching date and equipment name, skipping the header row.
   const existingIndex = rows.findIndex((row, index) =>
     index > 0 &&
     String(row[0] || "").trim() === record.date &&
@@ -196,51 +165,16 @@ async function saveToGoogleSheets(record, env) {
     new Date().toISOString()
   ]];
 
-  const batchUpdate = async requests => {
-    const response = await fetch(
-      `${baseUrl}:batchUpdate`,
-      {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ requests })
-      }
+  // If a matching record exists, update its current row.
+  if (existingIndex !== -1) {
+    const rowNumber = existingIndex + 1;
+
+    const updateRange = encodeURIComponent(
+      `Records!A${rowNumber}:D${rowNumber}`
     );
 
-    const result = await response.json();
-
-    if (!response.ok) {
-      console.error("Google Sheets row operation error:", result);
-      throw new Error("Unable to organize the Google Sheets records.");
-    }
-
-    return result;
-  };
-
-  // Existing record: move its ENTIRE row to row 2.
-  if (existingIndex !== -1) {
-
-    // Move only when the record is not already at row 2.
-    if (existingIndex !== 1) {
-      await batchUpdate([
-        {
-          moveDimension: {
-            source: {
-              sheetId,
-              dimension: "ROWS",
-              startIndex: existingIndex,
-              endIndex: existingIndex + 1
-            },
-            destinationIndex: 1
-          }
-        }
-      ]);
-    }
-
-    // Update only columns A:D.
-    const updateRange = encodeURIComponent("Records!A2:D2");
-
     const updateResponse = await fetch(
-      `${baseUrl}/values/${updateRange}?valueInputOption=RAW`,
+      `${GOOGLE_SHEETS_API}/${spreadsheetId}/values/${updateRange}?valueInputOption=RAW`,
       {
         method: "PUT",
         headers,
@@ -258,28 +192,11 @@ async function saveToGoogleSheets(record, env) {
     return { action: "updated" };
   }
 
-  // New record: insert an entire blank row at row 2.
-  await batchUpdate([
-    {
-      insertDimension: {
-        range: {
-          sheetId,
-          dimension: "ROWS",
-          startIndex: 1,
-          endIndex: 2
-        },
-        inheritFromBefore: false
-      }
-    }
-  ]);
-
-  // Write only columns A:D.
-  const newRowRange = encodeURIComponent("Records!A2:D2");
-
+  // Otherwise, append a new record after existing records.
   const appendResponse = await fetch(
-    `${baseUrl}/values/${newRowRange}?valueInputOption=RAW`,
+    `${url}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
     {
-      method: "PUT",
+      method: "POST",
       headers,
       body: JSON.stringify({ values })
     }
@@ -288,8 +205,8 @@ async function saveToGoogleSheets(record, env) {
   const appendResult = await appendResponse.json();
 
   if (!appendResponse.ok) {
-    console.error("Google Sheets insert error:", appendResult);
-    throw new Error("Unable to save the new record.");
+    console.error("Google Sheets append error:", appendResult);
+    throw new Error("Unable to append the new record.");
   }
 
   return { action: "appended" };
