@@ -219,10 +219,89 @@ async function saveToGoogleSheets(record, env) {
   return { action: "appended" };
 }
 
+// Retrieve all equipment records for Excel.
+async function getRecordsFromGoogleSheets(env) {
+  const accessToken = await getGoogleAccessToken(env);
+  const spreadsheetId = env.GOOGLE_SHEET_ID;
+
+  const range = encodeURIComponent("Records!A:D");
+
+  const response = await fetch(
+    `${GOOGLE_SHEETS_API}/${spreadsheetId}/values/${range}`,
+    {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${accessToken}`
+      }
+    }
+  );
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    console.error("Google Sheets read error:", result);
+    throw new Error("Unable to retrieve equipment records.");
+  }
+
+  const rows = result.values || [];
+
+  // Skip the header row and return individual records.
+  return rows.slice(1)
+    .filter(row => row[0] && row[1])
+    .map(row => ({
+      date: row[0],
+      equipment: row[1],
+      hmr: row[2] ?? null,
+      submittedAt: row[3] ?? null
+    }));
+}
+
 // Main Worker
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    
+    // Read-only API for Excel Power Query.
+    if (url.pathname === "/api/records") {
+      if (request.method !== "GET") {
+        return jsonResponse(
+          { success: false, message: "Method not allowed." },
+          405
+        );
+      }
+
+      // Verify Excel API key.
+      if (
+        !env.EXCEL_API_KEY ||
+        request.headers.get("X-API-Key") !== env.EXCEL_API_KEY
+      ) {
+        return jsonResponse(
+          { success: false, message: "Unauthorized." },
+          401
+        );
+      }
+
+      try {
+        const records = await getRecordsFromGoogleSheets(env);
+
+        return jsonResponse({
+          success: true,
+          count: records.length,
+          records
+        });
+
+      } catch (error) {
+        console.error("Excel records retrieval failed:", error);
+
+        return jsonResponse(
+          {
+            success: false,
+            message: "Unable to retrieve records."
+          },
+          500
+        );
+      }
+    }
 
     // Handle form submissions
     if (url.pathname === "/api/submit") {
