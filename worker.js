@@ -360,7 +360,38 @@ async function addEquipmentToMasterlist(equipment, env) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    
+
+    // Retrieve equipment masterlist for website dropdown.
+    if (url.pathname === "/api/equipment") {
+      if (request.method !== "GET") {
+        return jsonResponse(
+          { success: false, message: "Method not allowed." },
+          405
+        );
+      }
+
+      try {
+        const equipment = await getEquipmentListFromGoogleSheets(env);
+
+        return jsonResponse({
+          success: true,
+          count: equipment.length,
+          equipment
+        });
+
+      } catch (error) {
+        console.error("Equipment list retrieval failed:", error);
+
+        return jsonResponse(
+          {
+            success: false,
+            message: "Unable to retrieve equipment list."
+          },
+          500
+        );
+      }
+    }
+
     // Read-only API for Excel Power Query.
     if (url.pathname === "/api/records") {
       if (request.method !== "GET") {
@@ -448,6 +479,10 @@ export default {
           throw new Error("Google Sheets configuration is incomplete.");
         }
 
+        // Add equipment to masterlist if it does not exist.
+        await addEquipmentToMasterlist(equipment, env);
+        
+        // Save the accomplishment record.
         const saveResult = await saveToGoogleSheets(
           { date, equipment, hmr },
           env
