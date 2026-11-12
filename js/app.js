@@ -21,6 +21,7 @@ document.addEventListener("DOMContentLoaded", () => {
   
     // Load equipment suggestions when the website opens.
     loadEquipmentOptions();
+    
   // Get the HTML elements
   const form = document.getElementById("equipment-form");
   const dateInput = document.getElementById("date");
@@ -86,7 +87,10 @@ document.addEventListener("DOMContentLoaded", () => {
       equipmentInput.value = "";
       hmrInput.value = "";
       dateInput.value = localDate;
-
+        
+      // Refresh equipment suggestions from Google Sheets
+      await loadEquipmentOptions();
+        
       showMessage("Record saved successfully!", "success");
 
       equipmentInput.focus();
