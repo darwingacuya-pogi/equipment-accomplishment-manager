@@ -62,10 +62,13 @@
               id="equipment"
               name="equipment"
               type="text"
-              placeholder="e.g. EX01"
+              list="equipment-options"
+              placeholder="Select or type equipment..."
               maxlength="100"
+              autocomplete="off"
               required
             >
+            <datalist id="equipment-options"></datalist>
           </label>
 
           <label class="field" for="hmr">
