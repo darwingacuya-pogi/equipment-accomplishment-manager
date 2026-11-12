@@ -31,3 +31,17 @@ async function submitEquipmentRecord(record) {
 
   return result;
 }
+
+async function getEquipmentList() {
+  const response = await fetch("/api/equipment");
+
+  const result = await response.json();
+
+  if (!response.ok || !result.success) {
+    throw new Error(
+      result.message || "Unable to retrieve equipment list."
+    );
+  }
+
+  return result.equipment || [];
+}
