@@ -256,6 +256,106 @@ async function getRecordsFromGoogleSheets(env) {
     }));
 }
 
+
+// Retrieve the equipment masterlist from Google Sheets.
+async function getEquipmentListFromGoogleSheets(env) {
+  const accessToken = await getGoogleAccessToken(env);
+  const spreadsheetId = env.GOOGLE_SHEET_ID;
+
+  const range = encodeURIComponent("Equipment!A:A");
+
+  const response = await fetch(
+    `${GOOGLE_SHEETS_API}/${spreadsheetId}/values/${range}`,
+    {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${accessToken}`
+      }
+    }
+  );
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    console.error("Equipment masterlist read error:", result);
+    throw new Error("Unable to retrieve equipment masterlist.");
+  }
+
+  const rows = result.values || [];
+
+  return rows
+    .slice(1)
+    .map(row => String(row[0] || "").trim())
+    .filter(Boolean);
+}
+
+// Add new equipment to the masterlist if it does not exist.
+async function addEquipmentToMasterlist(equipment, env) {
+  const accessToken = await getGoogleAccessToken(env);
+  const spreadsheetId = env.GOOGLE_SHEET_ID;
+
+  const headers = {
+    "Authorization": `Bearer ${accessToken}`,
+    "Content-Type": "application/json"
+  };
+
+  const range = encodeURIComponent("Equipment!A:A");
+
+  const readResponse = await fetch(
+    `${GOOGLE_SHEETS_API}/${spreadsheetId}/values/${range}`,
+    {
+      method: "GET",
+      headers
+    }
+  );
+
+  const result = await readResponse.json();
+
+  if (!readResponse.ok) {
+    console.error("Equipment masterlist read error:", result);
+    throw new Error("Unable to check equipment masterlist.");
+  }
+
+  const rows = result.values || [];
+
+  const normalize = value =>
+    String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+
+  const exists = rows.some((row, index) =>
+    index > 0 && normalize(row[0]) === normalize(equipment)
+  );
+
+  if (exists) {
+    return { action: "exists" };
+  }
+
+  const nextRow = Math.max(rows.length + 1, 2);
+
+  const updateRange = encodeURIComponent(
+    `Equipment!A${nextRow}:A${nextRow}`
+  );
+
+  const writeResponse = await fetch(
+    `${GOOGLE_SHEETS_API}/${spreadsheetId}/values/${updateRange}?valueInputOption=RAW`,
+    {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({
+        values: [[equipment.trim()]]
+      })
+    }
+  );
+
+  const writeResult = await writeResponse.json();
+
+  if (!writeResponse.ok) {
+    console.error("Equipment masterlist write error:", writeResult);
+    throw new Error("Unable to add equipment to masterlist.");
+  }
+
+  return { action: "added" };
+}
+
 // Main Worker
 export default {
   async fetch(request, env) {
