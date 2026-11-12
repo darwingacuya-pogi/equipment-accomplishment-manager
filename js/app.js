@@ -1,5 +1,26 @@
 
 document.addEventListener("DOMContentLoaded", () => {
+    const equipmentOptions = document.getElementById("equipment-options");
+  
+    async function loadEquipmentOptions() {
+      try {
+        const equipmentList = await getEquipmentList();
+  
+        equipmentOptions.innerHTML = "";
+  
+        equipmentList.forEach(equipment => {
+          const option = document.createElement("option");
+          option.value = equipment;
+          equipmentOptions.appendChild(option);
+        });
+  
+      } catch (error) {
+        console.error("Unable to load equipment list:", error);
+      }
+    }
+  
+    // Load equipment suggestions when the website opens.
+    loadEquipmentOptions();
   // Get the HTML elements
   const form = document.getElementById("equipment-form");
   const dateInput = document.getElementById("date");
