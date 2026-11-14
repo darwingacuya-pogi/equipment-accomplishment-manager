@@ -158,11 +158,41 @@ async function saveToGoogleSheets(record, env) {
     normalizeEquipment(row[1]) === submittedEquipment
   );
 
+  const now = new Date();
+
+	 const parts = new
+  Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Manila",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(now);
+
+  const timestamp = Object.fromEntries(
+    parts.map(part => [part.type, part.value])
+  );
+
+  // Convert Philippine local date/time into a Google Sheets date serial.
+  const philippineTime = (
+    Date.UTC(
+      Number(timestamp.year),
+      Number(timestamp.month) - 1,
+      Number(timestamp.day),
+      Number(timestamp.hour),
+      Number(timestamp.minute),
+      Number(timestamp.second)
+    ) / 86400000
+  ) + 25569;
+
   const values = [[
     record.date,
     record.equipment,
     record.hmr,
-    new Date().toISOString()
+    philippineTime
   ]];
 
   // If a matching record exists, update its current row.
